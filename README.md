@@ -1,40 +1,35 @@
 # Bản đồ nền Việt Nam
 
-Trang GitHub Pages tối giản dùng trực tiếp lớp WMS `vietnam_2026` từ:
+WebGIS tối giản sử dụng trực tiếp lớp WMS `vietnam_2026` từ `https://cache.bando.com.vn/service`, không cần dựng backend riêng.
 
-- Endpoint: `https://cache.bando.com.vn/service`
-- Service: WMS 1.1.1
-- Layer: `vietnam_2026`
-- CRS: EPSG:3857
-- Format: PNG
+## Chức năng hiện có
 
-## Cách tải mới
+- Bản đồ nền Việt Nam dạng WMS 1.1.1, EPSG:3857.
+- Cơ chế single-image WMS + buffer + retry để tránh lỗi thiếu tile.
+- Thanh công cụ dọc bên trái theo kiểu WebGIS:
+  - Toàn quốc
+  - Phóng to / thu nhỏ
+  - Toàn màn hình
+  - Quản lý lớp
+  - Thông tin bản đồ
+  - Vẽ tạm điểm / tuyến / vùng
+  - Đo khoảng cách / diện tích
+  - Định vị GPS
+- Thước tỷ lệ động ở góc trái dưới.
+- Tọa độ WGS84 cập nhật theo vị trí rê chuột.
+- Tỷ lệ xích ước tính dạng `1:n` cập nhật theo vị trí con trỏ và mức zoom.
+- Nhãn địa danh hiển thị theo đúng lớp raster `vietnam_2026`.
 
-Phiên bản trước dùng `TileWMS` 256×256. Trình duyệt phải phát nhiều request đồng thời; khi một số request rớt, bản đồ xuất hiện các mảng vuông trắng hoặc bị chia thành nhiều khối.
+## Lưu ý về lớp nhãn
 
-Phiên bản hiện tại chuyển sang **single-image WMS theo toàn viewport**:
+Trong mã nguồn trang được phân tích, `vietnam_2026` được trả về dưới dạng ảnh raster WMS. Tên địa danh, sông, đường và chữ chú thích hiện đang được render cùng ảnh bản đồ. Chưa có bằng chứng trong mã HTML được cung cấp rằng máy chủ công bố một layer nhãn độc lập để bật/tắt riêng.
 
-1. Tính BBOX EPSG:3857 từ vùng đang nhìn.
-2. Yêu cầu một ảnh WMS lớn bao phủ toàn viewport và thêm vùng đệm xung quanh.
-3. Giữ ảnh cũ trong lúc tải ảnh mới để tránh chớp trắng.
-4. Chỉ thay ảnh khi request mới tải hoàn chỉnh.
-5. Nếu request lỗi, tự thử lại với kích thước ảnh nhỏ hơn và tiếp tục retry.
-6. Giới hạn cạnh ảnh tối đa để tránh tạo request quá lớn cho máy chủ.
+Vì vậy giao diện hiện ghi rõ **Nhãn địa danh – Tích hợp** thay vì giả lập một layer không tồn tại.
 
-Cách này giảm mạnh số request và khắc phục hiện tượng thiếu tile khi xem trên GitHub Pages.
+## Triển khai
 
-## Giao diện
+Repo dùng trực tiếp GitHub Pages:
 
-Chỉ giữ:
+`https://vietflexmap.github.io/mapVN2/`
 
-- **Bản đồ nền Việt Nam**
-- bản đồ toàn màn hình
-- nút zoom
-
-Không sao chép header, footer, popup hoặc giao diện của trang nguồn.
-
-## Chạy
-
-Có thể mở `index.html` hoặc dùng GitHub Pages tại repository này.
-
-> Không cần backend riêng. Trình duyệt vẫn cần Internet để tải ảnh WMS từ `cache.bando.com.vn`.
+Không cần Node.js, Python, GeoServer hay PostGIS. Trang vẫn cần Internet để tải WMS và thư viện Leaflet từ CDN.
