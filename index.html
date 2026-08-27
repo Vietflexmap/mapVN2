@@ -1,426 +1,175 @@
 <!doctype html>
 <html lang="vi">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-  <meta name="theme-color" content="#102236" />
-  <title>Bản đồ nền Việt Nam</title>
-
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-
-  <style>
-    :root{
-      --nav:#13243a;
-      --nav-hover:#1c3553;
-      --active:#1d7df2;
-      --panel:rgba(15,31,49,.96);
-      --panel2:rgba(24,45,68,.97);
-      --border:rgba(255,255,255,.17);
-      --text:#f8fafc;
-      --muted:#aebed0;
-      --cyan:#38bdf8;
-      --yellow:#facc15;
-    }
-    *{box-sizing:border-box}
-    html,body,#map{width:100%;height:100%;margin:0}
-    body{overflow:hidden;background:#dbe7ed;font-family:Inter,system-ui,-apple-system,"Segoe UI",Arial,sans-serif}
-    #map{position:fixed;inset:0;background:#dbe7ed}
-
-    .map-title{
-      position:fixed;z-index:1200;top:max(12px,env(safe-area-inset-top));left:50%;transform:translateX(-50%);
-      padding:8px 15px;border-radius:999px;background:rgba(13,30,48,.90);color:#fff;border:1px solid var(--border);
-      font-size:13px;font-weight:750;letter-spacing:.15px;box-shadow:0 8px 26px rgba(0,0,0,.24);pointer-events:none;
-      backdrop-filter:blur(8px)
-    }
-
-    .map-toolbar{
-      position:fixed;z-index:1300;left:18px;top:48px;display:flex;flex-direction:column;gap:8px
-    }
-    .tool-btn{
-      position:relative;width:52px;height:52px;border:1px solid var(--border);border-radius:14px;background:var(--nav);color:#dbeafe;
-      display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 7px 20px rgba(0,0,0,.19);transition:.15s ease;
-      padding:0
-    }
-    .tool-btn:hover{background:var(--nav-hover);transform:translateY(-1px)}
-    .tool-btn.active{background:var(--active);color:#fff;border-color:rgba(255,255,255,.25)}
-    .tool-btn svg{width:25px;height:25px;fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
-    .tool-btn::after{
-      content:attr(data-title);position:absolute;left:62px;top:50%;transform:translateY(-50%);white-space:nowrap;
-      padding:6px 9px;border-radius:7px;background:#0b1726;color:#fff;font-size:11px;opacity:0;visibility:hidden;transition:.12s;pointer-events:none
-    }
-    .tool-btn:hover::after{opacity:1;visibility:visible}
-    .sep{height:2px;background:rgba(255,255,255,.16);margin:0 9px;border-radius:2px}
-
-    .side-panel{
-      position:fixed;z-index:1250;left:82px;top:48px;width:310px;max-width:calc(100vw - 105px);max-height:calc(100vh - 115px);
-      overflow:auto;background:var(--panel);color:var(--text);border:1px solid var(--border);border-radius:14px;box-shadow:0 18px 45px rgba(0,0,0,.32);
-      display:none;backdrop-filter:blur(10px)
-    }
-    .side-panel.open{display:block}
-    .panel-head{position:sticky;top:0;z-index:2;display:flex;align-items:center;justify-content:space-between;padding:12px 13px;background:var(--panel2);border-bottom:1px solid var(--border)}
-    .panel-head strong{font-size:13px}.close-btn{border:0;background:transparent;color:#dbeafe;font-size:20px;cursor:pointer;line-height:1}
-    .panel-body{padding:12px 13px;font-size:12px;line-height:1.55}
-    .layer-row{display:flex;align-items:center;gap:9px;padding:9px 0;border-bottom:1px solid rgba(255,255,255,.08)}
-    .layer-row:last-child{border-bottom:0}.layer-row input{accent-color:var(--active)}
-    .layer-row .meta{display:block;color:var(--muted);font-size:10px;margin-top:2px}
-    .badge{display:inline-block;padding:2px 6px;border-radius:999px;background:rgba(56,189,248,.15);color:#7dd3fc;font-size:10px;border:1px solid rgba(56,189,248,.25)}
-    .notice{padding:9px 10px;border-radius:9px;background:rgba(56,189,248,.09);border:1px solid rgba(56,189,248,.18);color:#cfeeff;margin-top:8px}
-    .panel-actions{display:flex;gap:7px;flex-wrap:wrap;margin-top:10px}
-    .mini-btn{border:1px solid var(--border);background:#172c45;color:#eef6ff;border-radius:8px;padding:7px 9px;cursor:pointer;font-size:11px}
-    .mini-btn.active{background:#176fdb}
-
-    .status-box{
-      position:fixed;z-index:1200;right:20px;bottom:18px;display:flex;align-items:center;gap:10px;
-      min-width:355px;justify-content:flex-end;padding:8px 12px;border-radius:18px;background:rgba(20,45,67,.92);color:#dbeafe;
-      border:1px solid rgba(255,255,255,.16);box-shadow:0 9px 26px rgba(0,0,0,.22);font-size:12px;backdrop-filter:blur(8px)
-    }
-    .status-box .dot{color:#1d8fff;font-weight:700}.status-box .sep-v{width:1px;height:18px;background:rgba(255,255,255,.2)}
-    #coordText{font-variant-numeric:tabular-nums}.scale-ratio{display:flex;align-items:center;gap:5px;white-space:nowrap}
-    .scale-ratio input{width:105px;background:rgba(8,20,34,.55);border:1px solid rgba(255,255,255,.2);border-radius:6px;color:#eaf4ff;padding:4px 7px;font:600 12px/1.1 ui-monospace,Consolas,monospace}
-
-    .measure-readout{
-      position:fixed;z-index:1210;left:82px;bottom:75px;display:none;max-width:320px;padding:9px 11px;border-radius:10px;
-      background:rgba(13,30,48,.92);color:#fff;border:1px solid var(--border);font-size:12px;box-shadow:0 8px 24px rgba(0,0,0,.22)
-    }
-    .measure-readout.show{display:block}
-
-    .leaflet-control-attribution{display:none!important}
-    .leaflet-control-scale{margin-left:18px!important;margin-bottom:18px!important}
-    .leaflet-control-scale-line{background:rgba(255,255,255,.82)!important;border-color:#405166!important;color:#1e293b!important;font-size:11px!important;box-shadow:0 2px 8px rgba(0,0,0,.16)}
-    .leaflet-control-zoom{display:none!important}
-    .leaflet-popup{display:none!important}
-    .measure-line{filter:drop-shadow(0 1px 2px rgba(0,0,0,.35))}
-
-    @media(max-width:700px){
-      .map-toolbar{left:10px;top:44px;gap:6px}.tool-btn{width:44px;height:44px;border-radius:12px}.tool-btn svg{width:21px;height:21px}
-      .side-panel{left:62px;top:44px;width:calc(100vw - 74px);max-width:none}.map-title{font-size:12px;padding:7px 11px}
-      .status-box{left:10px;right:10px;bottom:10px;min-width:0;justify-content:center;font-size:11px}.scale-ratio input{width:88px}
-      .leaflet-control-scale{margin-left:10px!important;margin-bottom:60px!important}.measure-readout{left:62px;bottom:64px}
-    }
-  </style>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#07192b">
+<title>Bản đồ nền Việt Nam</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+:root{--nav:#07192b;--nav2:#0c2238;--panel:#0d2034f5;--line:#35506b;--red:#ff3b30;--yellow:#ffd84d;--text:#eef6ff;--muted:#9fb1c4;--blue:#2185f5}
+*{box-sizing:border-box}html,body,#map{width:100%;height:100%;margin:0}body{overflow:hidden;background:#d8e5ea;font-family:Inter,system-ui,-apple-system,"Segoe UI",Arial,sans-serif;color:var(--text)}
+#map{position:fixed;inset:64px 0 0;background:#d8e5ea}
+.topbar{position:fixed;z-index:3000;inset:0 0 auto;height:64px;display:flex;align-items:stretch;background:linear-gradient(180deg,#0a2035,#061727);border-bottom:1px solid #29455f;box-shadow:0 5px 18px #0005}
+.brand{height:64px;min-width:210px;display:flex;align-items:center;padding:0 18px;border-right:1px solid #2d465d;white-space:nowrap}.brand-mark{width:34px;height:34px;border-radius:9px;background:#991c19;display:grid;place-items:center;margin-right:10px;color:var(--yellow);font-weight:900}.brand b{display:block;color:var(--yellow);font-size:14px;letter-spacing:.2px}.brand small{display:block;color:#8fa8bd;font-size:10px;margin-top:2px}
+.toolbar{display:flex;align-items:stretch;overflow-x:auto;overflow-y:hidden;scrollbar-width:thin;flex:1}.tool{min-width:84px;height:64px;padding:6px 9px 5px;border:0;border-right:1px solid #203b53;background:transparent;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;transition:.15s}.tool:hover,.tool.active{background:#122c45}.tool.active{box-shadow:inset 0 -3px var(--red)}.tool svg{width:24px;height:24px;fill:none;stroke:var(--red);stroke-width:2.25;stroke-linecap:round;stroke-linejoin:round}.tool span{color:var(--yellow);font-size:10.5px;font-weight:700;white-space:nowrap}.tool:focus-visible{outline:2px solid var(--yellow);outline-offset:-3px}
+.panel{position:fixed;z-index:2700;top:74px;left:50%;transform:translateX(-50%) translateY(-6px);width:min(430px,calc(100vw - 24px));max-height:calc(100vh - 112px);overflow:auto;background:var(--panel);border:1px solid #3a536b;border-radius:16px;box-shadow:0 20px 50px #0008;backdrop-filter:blur(13px);display:none;opacity:0}.panel.open{display:block;animation:panelin .15s ease forwards}@keyframes panelin{to{opacity:1;transform:translateX(-50%) translateY(0)}}
+.panel.route{width:min(520px,calc(100vw - 24px))}.panel.small{width:min(350px,calc(100vw - 24px))}.panel-head{position:sticky;top:0;z-index:5;min-height:54px;padding:11px 14px;display:flex;align-items:center;justify-content:space-between;background:#102943;border-bottom:1px solid #36516a}.panel-title{display:flex;align-items:center;gap:9px;color:var(--yellow);font-weight:800}.panel-title svg{width:22px;height:22px;stroke:var(--red);fill:none;stroke-width:2.3}.xbtn{width:32px;height:32px;border:1px solid #425d76;border-radius:9px;background:#1b354f;color:#fff;font-size:21px;cursor:pointer}.panel-body{padding:13px 15px 15px}.section-title{margin:8px 0 6px;color:#a7b8c9;font-size:10.5px;text-transform:uppercase;letter-spacing:.75px;font-weight:800}.row{display:flex;align-items:center;gap:9px;padding:8px 0}.row label{flex:1;font-size:12px}.row small{display:block;color:var(--muted);font-size:10px;margin-top:2px}.swatch{width:15px;height:15px;border-radius:4px;flex:0 0 auto}.slider-row{display:flex;align-items:center;gap:8px;padding:2px 0 8px 29px}.slider-row input{flex:1;accent-color:var(--blue)}.percent{width:38px;text-align:right;color:#aebfd0;font-size:11px}.divider{height:1px;background:#30485f;margin:9px 0}
+input[type=checkbox],input[type=radio]{accent-color:var(--blue);width:16px;height:16px}.field{margin:9px 0}.field label{display:block;margin-bottom:5px;color:#b8c8d7;font-size:11px;font-weight:700}.input,.select{width:100%;height:42px;border:1px solid #52677a;border-radius:10px;background:#f7f9fc;color:#27384a;padding:0 11px;font-size:13px;outline:none}.input:focus,.select:focus{border-color:#2c8dff;box-shadow:0 0 0 3px #2185f526}.input-group{display:flex;gap:7px}.input-group .input{flex:1}.pick{width:45px;border:2px solid #2787f5;border-radius:11px;background:#f7f9fc;color:#1775df;font-weight:900;cursor:pointer}.route-badge{display:inline-grid;place-items:center;width:24px;height:24px;border-radius:50%;color:#fff;font-size:12px;margin-right:4px}.a{background:#22b765}.b{background:#ec473e}
+.action{width:100%;min-height:43px;border-radius:10px;border:1px solid #4c6177;background:#172f49;color:#e9f2fb;font-weight:750;cursor:pointer;margin-top:7px}.action:hover{filter:brightness(1.12)}.action.primary{background:linear-gradient(135deg,#1674db,#3d91fa);border-color:#459dff;color:#fff}.action.danger{background:#fff1f0;border:2px solid #ff554b;color:#e5362e}.action.gold{border-color:#7a6320;color:var(--yellow)}.action-row{display:grid;grid-template-columns:1fr 1fr;gap:8px}.notice{margin-top:9px;padding:9px 10px;border:1px solid #3b5972;border-radius:10px;background:#102b44;color:#bcd0e1;font-size:10.5px;line-height:1.45}.result{margin-top:10px;padding:10px;border-radius:10px;background:#0b1c2e;border:1px solid #304b65;font-size:11px;line-height:1.55;color:#cbd9e6;display:none}.result.show{display:block}
+.status{position:fixed;z-index:2400;right:18px;bottom:16px;display:flex;align-items:center;gap:10px;padding:8px 12px;border:1px solid #52677a;border-radius:18px;background:#15354eea;color:#c6d4e0;box-shadow:0 7px 24px #0005;font-size:11.5px;backdrop-filter:blur(8px)}.status .pin{color:var(--red);font-weight:900}.status .vline{width:1px;height:18px;background:#ffffff2c}.scale-edit{display:flex;align-items:center;gap:5px}.scale-edit input{width:94px;background:#0d263d;border:1px solid #5b7084;border-radius:6px;color:#fff;padding:4px 6px;font:700 11px ui-monospace,Consolas,monospace}
+.measure-tip{position:fixed;z-index:2450;left:18px;bottom:72px;display:none;padding:8px 10px;border-radius:9px;background:#0b2034ec;border:1px solid #456078;color:#fff;font-size:11px}.measure-tip.show{display:block}.leaflet-control-attribution{display:none!important}.leaflet-control-zoom{display:none!important}.leaflet-control-scale{margin-left:18px!important;margin-bottom:17px!important}.leaflet-control-scale-line{background:#ffffffdb!important;border-color:#334b61!important;color:#102236!important;font-size:10px!important}.leaflet-popup{display:none!important}
+.dot-icon{background:transparent;border:0}.route-pin{width:24px;height:24px;border-radius:50%;display:grid;place-items:center;color:#fff;font:800 12px Arial;border:2px solid white;box-shadow:0 2px 8px #0007}.route-pin.a{background:#22b765}.route-pin.b{background:#ec473e}
+@media(max-width:860px){.brand{min-width:150px;padding:0 10px}.brand small{display:none}.tool{min-width:68px}.tool span{font-size:9.5px}}
+@media(max-width:620px){#map{inset:56px 0 0}.topbar{height:56px}.brand{height:56px;min-width:122px}.brand-mark{width:29px;height:29px}.brand b{font-size:11px}.toolbar{height:56px}.tool{height:56px;min-width:59px;padding:4px}.tool svg{width:21px;height:21px}.tool span{font-size:8.5px}.panel{top:65px;max-height:calc(100vh - 112px)}.status{left:8px;right:8px;bottom:8px;justify-content:center;font-size:10px}.scale-edit input{width:78px}.leaflet-control-scale{margin-left:8px!important;margin-bottom:55px!important}.measure-tip{left:8px;bottom:58px}.action-row{grid-template-columns:1fr}}
+</style>
 </head>
 <body>
-  <div id="map" aria-label="Bản đồ nền Việt Nam"></div>
-  <div class="map-title">Bản đồ nền Việt Nam</div>
+<div id="map" aria-label="Bản đồ nền Việt Nam"></div>
+<header class="topbar">
+  <div class="brand"><div class="brand-mark">VN</div><div><b>Bản đồ nền Việt Nam</b><small>WebGIS trực tuyến</small></div></div>
+  <nav class="toolbar" aria-label="Công cụ bản đồ">
+    <button class="tool" id="homeBtn" title="Toàn quốc"><svg viewBox="0 0 24 24"><path d="M3 11.5 12 4l9 7.5M5.5 10.5V20h13v-9.5M9.5 20v-6h5v6"/></svg><span>Toàn quốc</span></button>
+    <button class="tool" id="zoomInBtn" title="Phóng to"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg><span>Phóng to</span></button>
+    <button class="tool" id="zoomOutBtn" title="Thu nhỏ"><svg viewBox="0 0 24 24"><path d="M5 12h14"/></svg><span>Thu nhỏ</span></button>
+    <button class="tool" id="fullBtn" title="Toàn màn hình"><svg viewBox="0 0 24 24"><path d="M8 3H3v5M16 3h5v5M8 21H3v-5M16 21h5v-5"/></svg><span>Toàn màn hình</span></button>
+    <button class="tool" id="layersBtn" data-panel="layersPanel"><svg viewBox="0 0 24 24"><path d="m12 3 9 5-9 5-9-5 9-5ZM3 12l9 5 9-5M3 16l9 5 9-5"/></svg><span>Lớp bản đồ</span></button>
+    <button class="tool" id="infoBtn" data-panel="infoPanel"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5h.01"/></svg><span>Thông tin</span></button>
+    <button class="tool" id="drawBtn" data-panel="drawPanel"><svg viewBox="0 0 24 24"><path d="M4 20h4L20 8l-4-4L4 16v4ZM13.5 6.5l4 4"/></svg><span>Vẽ</span></button>
+    <button class="tool" id="measureBtn" data-panel="measurePanel"><svg viewBox="0 0 24 24"><path d="M4 19 19 4l2 2L6 21H4v-2ZM9 14l2 2M12 11l2 2M15 8l2 2"/></svg><span>Đo đạc</span></button>
+    <button class="tool" id="routeBtn" data-panel="routePanel"><svg viewBox="0 0 24 24"><circle cx="5" cy="18" r="2"/><circle cx="19" cy="6" r="2"/><path d="M7 18h3c4 0 4-6 8-6h1M5 16V8c0-2 2-3 4-3h3"/></svg><span>Tìm đường</span></button>
+    <button class="tool" id="locateBtn" title="Vị trí của tôi"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r="8"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg><span>Vị trí</span></button>
+  </nav>
+</header>
 
-  <div class="map-toolbar" aria-label="Thanh công cụ bản đồ">
-    <button class="tool-btn" id="homeBtn" data-title="Toàn quốc" aria-label="Toàn quốc">
-      <svg viewBox="0 0 24 24"><path d="M3 11.5 12 4l9 7.5"/><path d="M5.5 10.5V20h13v-9.5"/><path d="M9.5 20v-6h5v6"/></svg>
-    </button>
-    <button class="tool-btn" id="zoomInBtn" data-title="Phóng to" aria-label="Phóng to">
-      <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
-    </button>
-    <button class="tool-btn" id="zoomOutBtn" data-title="Thu nhỏ" aria-label="Thu nhỏ">
-      <svg viewBox="0 0 24 24"><path d="M5 12h14"/></svg>
-    </button>
-    <button class="tool-btn" id="fullBtn" data-title="Toàn màn hình" aria-label="Toàn màn hình">
-      <svg viewBox="0 0 24 24"><path d="M8 3H3v5M16 3h5v5M8 21H3v-5M16 21h5v-5"/></svg>
-    </button>
-    <div class="sep"></div>
-    <button class="tool-btn" id="layersBtn" data-title="Lớp bản đồ" aria-label="Lớp bản đồ">
-      <svg viewBox="0 0 24 24"><path d="m12 3 9 5-9 5-9-5 9-5Z"/><path d="m3 12 9 5 9-5M3 16l9 5 9-5"/></svg>
-    </button>
-    <button class="tool-btn" id="infoBtn" data-title="Thông tin bản đồ" aria-label="Thông tin">
-      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5h.01"/></svg>
-    </button>
-    <button class="tool-btn" id="drawBtn" data-title="Vẽ tạm" aria-label="Vẽ tạm">
-      <svg viewBox="0 0 24 24"><path d="M4 20h4l11-11-4-4L4 16v4Z"/><path d="m13.5 6.5 4 4"/></svg>
-    </button>
-    <button class="tool-btn" id="measureBtn" data-title="Đo đạc" aria-label="Đo đạc">
-      <svg viewBox="0 0 24 24"><path d="M4 19 19 4l2 2L6 21H4v-2Z"/><path d="m9 14 2 2M12 11l2 2M15 8l2 2"/></svg>
-    </button>
-    <button class="tool-btn" id="locateBtn" data-title="Vị trí của tôi" aria-label="Vị trí của tôi">
-      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/><circle cx="12" cy="12" r="8"/></svg>
-    </button>
-  </div>
+<section class="panel" id="layersPanel">
+ <div class="panel-head"><div class="panel-title"><svg viewBox="0 0 24 24"><path d="m12 3 9 5-9 5-9-5 9-5ZM3 12l9 5 9-5"/></svg>Lớp bản đồ</div><button class="xbtn" data-close>×</button></div>
+ <div class="panel-body">
+  <div class="section-title">Lớp nền bản đồ</div>
+  <div class="row"><input type="radio" name="base" id="baseTerrain" checked><span class="swatch" style="background:#a77f6d"></span><label for="baseTerrain">Ảnh địa hình (ESRI Terrain)<small>Nền tham chiếu địa hình</small></label></div>
+  <div class="slider-row"><span>◐</span><input id="terrainOpacity" type="range" min="0" max="100" value="100"><span class="percent" id="terrainPct">100%</span></div>
+  <div class="row"><input type="radio" name="base" id="baseSatellite"><span class="swatch" style="background:#25b862"></span><label for="baseSatellite">Ảnh vệ tinh (ESRI)<small>World Imagery</small></label></div>
+  <div class="slider-row"><span>◐</span><input id="satOpacity" type="range" min="0" max="100" value="100"><span class="percent" id="satPct">100%</span></div>
+  <div class="row"><input type="radio" name="base" id="baseNone"><span class="swatch" style="background:#687b8d"></span><label for="baseNone">Không dùng lớp nền</label></div>
+  <div class="divider"></div>
+  <div class="section-title">Lớp phủ bản đồ</div>
+  <div class="row"><input type="checkbox" id="wmsVisible" checked><span class="swatch" style="background:#12a9bb"></span><label for="wmsVisible"><b>Bản đồ nền Việt Nam</b><small>WMS vietnam_2026 · EPSG:3857</small></label></div>
+  <div class="slider-row"><span>◐</span><input id="wmsOpacity" type="range" min="0" max="100" value="100"><span class="percent" id="wmsPct">100%</span></div>
+  <div class="row"><input type="checkbox" id="labelsIntegrated" checked disabled><span class="swatch" style="background:#ffb020"></span><label>Nhãn địa danh<small>Nhãn được tích hợp trực tiếp trong ảnh WMS hiện tại</small></label></div>
+  <div class="row"><input type="checkbox" id="drawVisible" checked><span class="swatch" style="background:#27c46a"></span><label for="drawVisible">Dữ liệu cá nhân<small>Điểm, tuyến và vùng vẽ trong phiên làm việc</small></label></div>
+  <div class="notice">Các lớp ESRI chỉ là nền tham chiếu tùy chọn. Lớp chính của trang vẫn là “Bản đồ nền Việt Nam”.</div>
+ </div>
+</section>
 
-  <section class="side-panel" id="layersPanel">
-    <div class="panel-head"><strong>Lớp bản đồ</strong><button class="close-btn" data-close="layersPanel">×</button></div>
-    <div class="panel-body">
-      <div class="layer-row">
-        <input type="checkbox" id="baseVisible" checked />
-        <label for="baseVisible"><b>Bản đồ nền Việt Nam</b><span class="meta">WMS · vietnam_2026 · EPSG:3857</span></label>
-      </div>
-      <div class="layer-row">
-        <input type="checkbox" id="labelsVisible" checked />
-        <label for="labelsVisible"><b>Nhãn địa danh</b> <span class="badge">Tích hợp</span><span class="meta">Tên địa danh, sông, đường và ký hiệu chữ nằm trong ảnh raster của lớp vietnam_2026.</span></label>
-      </div>
-      <div class="layer-row">
-        <span style="width:16px">◐</span>
-        <label><b>Độ trong suốt</b><span class="meta"><input id="opacityRange" type="range" min="30" max="100" value="100" style="width:100%;accent-color:#1d7df2"></span></label>
-      </div>
-      <div class="notice">Nguồn WMS hiện không công bố một lớp nhãn tách biệt trong mã trang đã cung cấp; nhãn đang được render cùng bản đồ. Công tắc “Nhãn địa danh” vì vậy giữ trạng thái hiển thị nhãn tích hợp, không giả lập một lớp dữ liệu khác.</div>
-    </div>
-  </section>
+<section class="panel small" id="measurePanel">
+ <div class="panel-head"><div class="panel-title"><svg viewBox="0 0 24 24"><path d="M4 19 19 4l2 2L6 21H4v-2ZM9 14l2 2M12 11l2 2"/></svg>Đo đạc</div><button class="xbtn" data-close>×</button></div>
+ <div class="panel-body">
+  <button class="action gold" id="measureDistance">▰ &nbsp; Đo chiều dài</button>
+  <button class="action gold" id="measureArea">▱ &nbsp; Đo diện tích</button>
+  <button class="action" id="measureClear">▣ &nbsp; Xóa kết quả đo</button>
+  <div class="notice">Click các đỉnh trên bản đồ. Double-click hoặc bấm “Kết thúc đo” để hoàn tất.</div>
+  <button class="action primary" id="measureFinish">Kết thúc đo</button>
+ </div>
+</section>
 
-  <section class="side-panel" id="infoPanel">
-    <div class="panel-head"><strong>Thông tin bản đồ</strong><button class="close-btn" data-close="infoPanel">×</button></div>
-    <div class="panel-body">
-      <div><b>Lớp:</b> vietnam_2026</div>
-      <div><b>Dịch vụ:</b> WMS 1.1.1</div>
-      <div><b>Hệ quy chiếu:</b> EPSG:3857</div>
-      <div><b>Định dạng:</b> image/png</div>
-      <div><b>Cơ chế tải:</b> single-image WMS + buffer + retry</div>
-      <div class="notice">Di chuyển chuột trên bản đồ để xem tọa độ WGS84 và tỷ lệ xích ước tính theo vị trí con trỏ.</div>
-    </div>
-  </section>
+<section class="panel" id="drawPanel">
+ <div class="panel-head"><div class="panel-title"><svg viewBox="0 0 24 24"><path d="M4 20h4L20 8l-4-4L4 16v4Z"/></svg>Vẽ dữ liệu</div><button class="xbtn" data-close>×</button></div>
+ <div class="panel-body">
+  <div class="action-row"><button class="action gold" data-draw="point">● Vẽ điểm</button><button class="action gold" data-draw="line">━ Vẽ đường</button></div>
+  <button class="action gold" data-draw="polygon">▱ Vẽ vùng</button>
+  <div class="action-row"><button class="action primary" id="drawFinish">Kết thúc</button><button class="action" id="drawClear">Xóa dữ liệu vẽ</button></div>
+  <div class="notice">Dữ liệu vẽ là lớp tạm thời trong trình duyệt và có thể bật/tắt tại panel “Lớp bản đồ”.</div>
+ </div>
+</section>
 
-  <section class="side-panel" id="drawPanel">
-    <div class="panel-head"><strong>Vẽ tạm trên bản đồ</strong><button class="close-btn" data-close="drawPanel">×</button></div>
-    <div class="panel-body">
-      <div class="panel-actions">
-        <button class="mini-btn" data-draw="point">Điểm</button>
-        <button class="mini-btn" data-draw="line">Tuyến</button>
-        <button class="mini-btn" data-draw="polygon">Vùng</button>
-        <button class="mini-btn" id="finishDrawBtn">Kết thúc</button>
-        <button class="mini-btn" id="clearDrawBtn">Xóa</button>
-      </div>
-      <div class="notice">Điểm: click một lần. Tuyến/Vùng: click nhiều điểm, sau đó bấm “Kết thúc”. Đây là lớp vẽ tạm phía trình duyệt.</div>
-    </div>
-  </section>
+<section class="panel route" id="routePanel">
+ <div class="panel-head"><div class="panel-title"><svg viewBox="0 0 24 24"><circle cx="5" cy="18" r="2"/><circle cx="19" cy="6" r="2"/><path d="M7 18h3c4 0 4-6 8-6h1"/></svg>Tìm đường</div><button class="xbtn" data-close>×</button></div>
+ <div class="panel-body">
+  <div class="field"><select id="routeProfile" class="select"><option value="driving">🚗 Lái xe (đường bộ)</option><option disabled>🚶 Đi bộ — cần dịch vụ định tuyến riêng</option><option disabled>🚲 Xe đạp — cần dịch vụ định tuyến riêng</option></select></div>
+  <div class="field"><label><span class="route-badge a">A</span> Điểm đầu &nbsp;<small>(tọa độ lat,lon hoặc địa chỉ)</small></label><div class="input-group"><input id="routeStart" class="input" placeholder="VD: 21.028511, 105.804817 hoặc Hà Nội"><button class="pick" data-pick="start" title="Chọn trên bản đồ">⌖</button></div></div>
+  <button class="action" id="routeSwap">⇄ &nbsp; Đổi điểm đầu / điểm cuối</button>
+  <div class="field"><label><span class="route-badge b">B</span> Điểm cuối &nbsp;<small>(tọa độ lat,lon hoặc địa chỉ)</small></label><div class="input-group"><input id="routeEnd" class="input" placeholder="VD: 10.823099, 106.629664 hoặc TP.HCM"><button class="pick" data-pick="end" title="Chọn trên bản đồ">⌖</button></div></div>
+  <div class="divider"></div>
+  <button class="action primary" id="routeCalc">⌁ &nbsp; Tính tuyến đường</button>
+  <button class="action danger" id="routeClear">▣ &nbsp; Xóa tuyến đường</button>
+  <div class="result" id="routeResult"></div>
+  <div class="notice">Tuyến lái xe dùng dịch vụ định tuyến công cộng OSRM; địa chỉ văn bản được tìm qua Nominatim. Có thể chọn A/B trực tiếp trên bản đồ để không cần geocoding.</div>
+ </div>
+</section>
 
-  <section class="side-panel" id="measurePanel">
-    <div class="panel-head"><strong>Đo đạc</strong><button class="close-btn" data-close="measurePanel">×</button></div>
-    <div class="panel-body">
-      <div class="panel-actions">
-        <button class="mini-btn" id="measureDistanceBtn">Khoảng cách</button>
-        <button class="mini-btn" id="measureAreaBtn">Diện tích</button>
-        <button class="mini-btn" id="finishMeasureBtn">Kết thúc</button>
-        <button class="mini-btn" id="clearMeasureBtn">Xóa</button>
-      </div>
-      <div class="notice">Click các điểm trên bản đồ. Kết quả được cập nhật tức thời. Đo diện tích cần ít nhất 3 điểm.</div>
-    </div>
-  </section>
+<section class="panel small" id="infoPanel">
+ <div class="panel-head"><div class="panel-title"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5h.01"/></svg>Thông tin bản đồ</div><button class="xbtn" data-close>×</button></div>
+ <div class="panel-body">
+  <div class="row"><label><b>Lớp chính</b><small>vietnam_2026</small></label></div>
+  <div class="row"><label><b>Dịch vụ</b><small>WMS 1.1.1 · image/png · EPSG:3857</small></label></div>
+  <div class="row"><label><b>Cơ chế tải</b><small>Single-image WMS + buffer + retry để hạn chế ô trắng</small></label></div>
+  <div class="notice">Rê chuột trên bản đồ để xem tọa độ WGS84 và tỷ lệ xích động ở góc dưới phải.</div>
+ </div>
+</section>
 
-  <div class="measure-readout" id="measureReadout">Sẵn sàng đo.</div>
+<div class="status"><span class="pin">●</span><span id="coordText">--°, --°</span><span class="vline"></span><span class="scale-edit">1:<input id="scaleInput" type="text" value="15000000" inputmode="numeric"></span></div>
+<div class="measure-tip" id="measureTip">Sẵn sàng đo.</div>
 
-  <div class="status-box">
-    <span class="dot">⌖</span><span id="coordText">—°, —°</span>
-    <span class="sep-v"></span>
-    <span class="scale-ratio">📏 1: <input id="ratioText" value="—" readonly /></span>
-  </div>
+<script>
+(()=>{'use strict';
+const WMS_URL='https://cache.bando.com.vn/service', WMS_LAYER='vietnam_2026';
+const map=L.map('map',{center:[16.25,106],zoom:6,minZoom:4,maxZoom:18,zoomControl:false,attributionControl:false,doubleClickZoom:false,preferCanvas:true});
+map.createPane('basePane');map.getPane('basePane').style.zIndex=200;map.createPane('wmsPane');map.getPane('wmsPane').style.zIndex=300;map.createPane('workPane');map.getPane('workPane').style.zIndex=500;
+const terrain=L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Terrain_Base/MapServer/tile/{z}/{y}/{x}',{pane:'basePane',maxZoom:13});
+const satellite=L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{pane:'basePane',maxZoom:18});
+terrain.addTo(map);L.control.scale({imperial:false,maxWidth:180,position:'bottomleft'}).addTo(map);
+map.fitBounds([[8,102],[23.5,110.5]],{padding:[24,24],animate:false});
 
-  <script>
-  (()=>{
-    'use strict';
+let activeWms=null,wmsVisible=true,wmsAlpha=1,wmsGeneration=0,wmsTimer=0;const BUFFER=.28,MAX_SIDE=1900,RETRY=[1,.78,.58];
+function bbox3857(bounds){const sw=map.options.crs.project(bounds.getSouthWest()),ne=map.options.crs.project(bounds.getNorthEast());return[sw.x,sw.y,ne.x,ne.y].join(',')}
+function wmsGeometry(scale){const s=map.getSize(),bx=Math.round(s.x*BUFFER),by=Math.round(s.y*BUFFER),nw=map.containerPointToLatLng(L.point(-bx,-by)),se=map.containerPointToLatLng(L.point(s.x+bx,s.y+by)),bounds=L.latLngBounds(nw,se),w=s.x+2*bx,h=s.y+2*by,dpr=Math.min(devicePixelRatio||1,1.5);let rs=Math.min(dpr*scale,MAX_SIDE/w,MAX_SIDE/h);rs=Math.max(.28,rs);return{bounds,width:Math.max(256,Math.round(w*rs)),height:Math.max(256,Math.round(h*rs))}}
+function wmsUrl(g){const p=new URLSearchParams({REQUEST:'GetMap',SERVICE:'WMS',VERSION:'1.1.1',FORMAT:'image/png',STYLES:'',TRANSPARENT:'true',LAYERS:WMS_LAYER,TILED:'false',WIDTH:String(g.width),HEIGHT:String(g.height),SRS:'EPSG:3857',BBOX:bbox3857(g.bounds)});return WMS_URL+'?'+p}
+function loadWms(gen,attempt=0){if(gen!==wmsGeneration)return;const g=wmsGeometry(RETRY[Math.min(attempt,RETRY.length-1)]),candidate=L.imageOverlay(wmsUrl(g),g.bounds,{pane:'wmsPane',opacity:0,interactive:false});candidate.on('load',()=>{if(gen!==wmsGeneration){map.removeLayer(candidate);return}candidate.setOpacity(wmsVisible?wmsAlpha:0);const old=activeWms;activeWms=candidate;if(old&&old!==candidate)setTimeout(()=>{if(map.hasLayer(old))map.removeLayer(old)},140)});candidate.on('error',()=>{if(map.hasLayer(candidate))map.removeLayer(candidate);if(gen!==wmsGeneration)return;if(attempt+1<RETRY.length)setTimeout(()=>loadWms(gen,attempt+1),350*(attempt+1));else setTimeout(()=>{if(gen===wmsGeneration)refreshWms()},1800)});candidate.addTo(map)}
+function refreshWms(){wmsGeneration++;loadWms(wmsGeneration)}function scheduleWms(ms=110){clearTimeout(wmsTimer);wmsTimer=setTimeout(refreshWms,ms)}
+map.on('moveend zoomend resize',()=>{scheduleWms();updateScale(map.getCenter().lat)});setTimeout(refreshWms,80);
 
-    const WMS_URL='https://cache.bando.com.vn/service';
-    const LAYER='vietnam_2026';
-    const VIETNAM_BOUNDS=L.latLngBounds([[8.0,102.0],[23.5,110.5]]);
-    const BUFFER=.30;
-    const MAX_IMAGE_SIDE=2200;
-    const RETRY_SCALES=[1,.82,.62];
+const panels=[...document.querySelectorAll('.panel')],toolPanelBtns=[...document.querySelectorAll('.tool[data-panel]')];
+function closePanels(){panels.forEach(p=>p.classList.remove('open'));toolPanelBtns.forEach(b=>b.classList.remove('active'))}
+function togglePanel(btn){const p=document.getElementById(btn.dataset.panel),was=p.classList.contains('open');closePanels();if(!was){p.classList.add('open');btn.classList.add('active')}}
+toolPanelBtns.forEach(b=>b.addEventListener('click',()=>togglePanel(b)));document.querySelectorAll('[data-close]').forEach(b=>b.onclick=closePanels);document.addEventListener('keydown',e=>{if(e.key==='Escape'){closePanels();stopModes()}});
 
-    const map=L.map('map',{
-      center:[16.25,106.0],zoom:6,minZoom:4,maxZoom:19,zoomControl:false,attributionControl:false,
-      preferCanvas:true,fadeAnimation:false,zoomAnimation:true,markerZoomAnimation:false,worldCopyJump:false,doubleClickZoom:false
-    });
-    map.fitBounds(VIETNAM_BOUNDS,{padding:[24,24],animate:false});
-    L.control.scale({position:'bottomleft',metric:true,imperial:false,maxWidth:180}).addTo(map);
+document.getElementById('homeBtn').onclick=()=>map.fitBounds([[8,102],[23.5,110.5]],{padding:[24,24]});document.getElementById('zoomInBtn').onclick=()=>map.zoomIn();document.getElementById('zoomOutBtn').onclick=()=>map.zoomOut();
+document.getElementById('fullBtn').onclick=async()=>{try{if(!document.fullscreenElement)await document.documentElement.requestFullscreen();else await document.exitFullscreen()}catch(e){}};
+document.getElementById('locateBtn').onclick=()=>map.locate({setView:true,maxZoom:16,enableHighAccuracy:true});let locationLayer=null;map.on('locationfound',e=>{if(locationLayer)map.removeLayer(locationLayer);locationLayer=L.layerGroup([L.circle(e.latlng,{radius:e.accuracy,pane:'workPane',color:'#ff3b30',weight:1,fillOpacity:.08}),L.circleMarker(e.latlng,{pane:'workPane',radius:6,color:'#fff',weight:2,fillColor:'#ff3b30',fillOpacity:1})]).addTo(map)});map.on('locationerror',()=>alert('Không lấy được vị trí. Hãy kiểm tra quyền định vị của trình duyệt.'));
 
-    let activeOverlay=null;
-    let generation=0;
-    let refreshTimer=0;
-    let baseVisible=true;
-    let baseOpacity=1;
+function setBase(which){if(map.hasLayer(terrain))map.removeLayer(terrain);if(map.hasLayer(satellite))map.removeLayer(satellite);if(which==='terrain')terrain.addTo(map);if(which==='satellite')satellite.addTo(map);if(activeWms)activeWms.bringToFront()}
+document.getElementById('baseTerrain').onchange=e=>e.target.checked&&setBase('terrain');document.getElementById('baseSatellite').onchange=e=>e.target.checked&&setBase('satellite');document.getElementById('baseNone').onchange=e=>e.target.checked&&setBase('none');
+function slider(id,pct,fn){const el=document.getElementById(id);el.oninput=()=>{document.getElementById(pct).textContent=el.value+'%';fn(+el.value/100)}}
+slider('terrainOpacity','terrainPct',v=>terrain.setOpacity(v));slider('satOpacity','satPct',v=>satellite.setOpacity(v));slider('wmsOpacity','wmsPct',v=>{wmsAlpha=v;if(activeWms)activeWms.setOpacity(wmsVisible?wmsAlpha:0)});document.getElementById('wmsVisible').onchange=e=>{wmsVisible=e.target.checked;if(activeWms)activeWms.setOpacity(wmsVisible?wmsAlpha:0)};
 
-    function projectedBBox(bounds){
-      const sw=map.options.crs.project(bounds.getSouthWest());
-      const ne=map.options.crs.project(bounds.getNorthEast());
-      return [sw.x,sw.y,ne.x,ne.y].join(',');
-    }
-    function requestGeometry(scaleFactor){
-      const size=map.getSize();
-      const pxX=Math.round(size.x*BUFFER),pxY=Math.round(size.y*BUFFER);
-      const nw=map.containerPointToLatLng(L.point(-pxX,-pxY));
-      const se=map.containerPointToLatLng(L.point(size.x+pxX,size.y+pxY));
-      const bounds=L.latLngBounds(nw,se);
-      const w=size.x+2*pxX,h=size.y+2*pxY;
-      const dpr=Math.min(window.devicePixelRatio||1,1.6);
-      let renderScale=dpr*scaleFactor;
-      renderScale=Math.min(renderScale,MAX_IMAGE_SIDE/w,MAX_IMAGE_SIDE/h);
-      renderScale=Math.max(renderScale,.30);
-      return {bounds,width:Math.max(256,Math.round(w*renderScale)),height:Math.max(256,Math.round(h*renderScale))};
-    }
-    function buildWmsUrl(bounds,width,height){
-      const p=new URLSearchParams();
-      p.set('REQUEST','GetMap');p.set('SERVICE','WMS');p.set('VERSION','1.1.1');p.set('FORMAT','image/png');
-      p.set('STYLES','');p.set('TRANSPARENT','true');p.set('LAYERS',LAYER);p.set('TILED','false');
-      p.set('WIDTH',String(width));p.set('HEIGHT',String(height));p.set('SRS','EPSG:3857');p.set('BBOX',projectedBBox(bounds));
-      return `${WMS_URL}?${p.toString()}`;
-    }
-    function loadGeneration(myGen,attempt=0){
-      if(myGen!==generation||!baseVisible)return;
-      const geom=requestGeometry(RETRY_SCALES[Math.min(attempt,RETRY_SCALES.length-1)]);
-      const candidate=L.imageOverlay(buildWmsUrl(geom.bounds,geom.width,geom.height),geom.bounds,{opacity:0,interactive:false});
-      candidate.on('load',()=>{
-        if(myGen!==generation||!baseVisible){if(map.hasLayer(candidate))map.removeLayer(candidate);return;}
-        candidate.setOpacity(baseOpacity);
-        const previous=activeOverlay;activeOverlay=candidate;
-        if(previous&&previous!==candidate)setTimeout(()=>{if(map.hasLayer(previous))map.removeLayer(previous)},120);
-      });
-      candidate.on('error',()=>{
-        if(map.hasLayer(candidate))map.removeLayer(candidate);
-        if(myGen!==generation||!baseVisible)return;
-        if(attempt+1<RETRY_SCALES.length)setTimeout(()=>loadGeneration(myGen,attempt+1),320*(attempt+1));
-        else setTimeout(()=>{if(myGen===generation&&baseVisible)refreshNow()},1800);
-      });
-      candidate.addTo(map);candidate.bringToBack();
-    }
-    function refreshNow(){generation++;loadGeneration(generation,0)}
-    function scheduleRefresh(delay=100){clearTimeout(refreshTimer);refreshTimer=setTimeout(refreshNow,delay)}
-    map.on('moveend zoomend resize',()=>scheduleRefresh(70));
-    refreshNow();
+const drawn=L.featureGroup([], {pane:'workPane'}).addTo(map),measureLayer=L.featureGroup([], {pane:'workPane'}).addTo(map),routeLayer=L.featureGroup([], {pane:'workPane'}).addTo(map);document.getElementById('drawVisible').onchange=e=>{if(e.target.checked)drawn.addTo(map);else map.removeLayer(drawn)};
+let drawMode=null,drawPts=[],drawPreview=null,measureMode=null,measurePts=[],measurePreview=null,routePick=null;const tip=document.getElementById('measureTip');
+function stopModes(){drawMode=null;drawPts=[];measureMode=null;measurePts=[];routePick=null;map.getContainer().style.cursor='';if(drawPreview){map.removeLayer(drawPreview);drawPreview=null}if(measurePreview){map.removeLayer(measurePreview);measurePreview=null}tip.classList.remove('show');document.querySelectorAll('[data-draw]').forEach(b=>b.classList.remove('active'))}
+function drawStart(mode){stopModes();drawMode=mode;map.getContainer().style.cursor='crosshair';document.querySelector(`[data-draw="${mode}"]`)?.classList.add('active')}
+document.querySelectorAll('[data-draw]').forEach(b=>b.onclick=()=>drawStart(b.dataset.draw));
+function refreshDrawPreview(mouse){if(!drawMode||drawMode==='point'||!drawPts.length)return;const pts=mouse?[...drawPts,mouse]:drawPts;if(drawPreview)map.removeLayer(drawPreview);drawPreview=drawMode==='polygon'?L.polygon(pts,{pane:'workPane',color:'#ff3b30',weight:2,fillColor:'#ffd84d',fillOpacity:.18}):L.polyline(pts,{pane:'workPane',color:'#ff3b30',weight:3});drawPreview.addTo(map)}
+function finishDraw(){if(drawMode==='line'&&drawPts.length>=2)L.polyline(drawPts,{pane:'workPane',color:'#ff3b30',weight:3}).addTo(drawn);if(drawMode==='polygon'&&drawPts.length>=3)L.polygon(drawPts,{pane:'workPane',color:'#ff3b30',weight:2,fillColor:'#ffd84d',fillOpacity:.2}).addTo(drawn);stopModes()}
+document.getElementById('drawFinish').onclick=finishDraw;document.getElementById('drawClear').onclick=()=>{drawn.clearLayers();stopModes()};
 
-    // Tọa độ WGS84 + tỷ lệ xích ước tính tại vị trí con trỏ (96 DPI CSS pixel).
-    const coordText=document.getElementById('coordText');
-    const ratioText=document.getElementById('ratioText');
-    function prettyScale(v){
-      if(!Number.isFinite(v)||v<=0)return '—';
-      const p=Math.pow(10,Math.max(0,Math.floor(Math.log10(v))-2));
-      return Math.round(v/p)*p;
-    }
-    function scaleDenominator(lat){
-      const z=map.getZoom();
-      const metersPerPixel=156543.03392804097*Math.cos(lat*Math.PI/180)/Math.pow(2,z);
-      return prettyScale(metersPerPixel*3779.5275590551);
-    }
-    function updateMouseStatus(latlng){
-      coordText.textContent=`${latlng.lat.toFixed(5)}°  ${latlng.lng.toFixed(5)}°`;
-      ratioText.value=new Intl.NumberFormat('vi-VN').format(scaleDenominator(latlng.lat));
-    }
-    map.on('mousemove',e=>updateMouseStatus(e.latlng));
-    map.on('mouseout',()=>{const c=map.getCenter();updateMouseStatus(c)});
-    map.on('zoomend',()=>updateMouseStatus(map.getCenter()));
-    updateMouseStatus(map.getCenter());
+function dist(points){let d=0;for(let i=1;i<points.length;i++)d+=map.distance(points[i-1],points[i]);return d}function area(points){if(points.length<3)return 0;const R=6378137,rad=Math.PI/180;let a=0;for(let i=0;i<points.length;i++){const p1=points[i],p2=points[(i+1)%points.length];a+=(p2.lng-p1.lng)*rad*(2+Math.sin(p1.lat*rad)+Math.sin(p2.lat*rad))}return Math.abs(a*R*R/2)}function fmtD(v){return v>=1000?(v/1000).toFixed(2)+' km':v.toFixed(1)+' m'}function fmtA(v){return v>=1e6?(v/1e6).toFixed(3)+' km²':v.toFixed(1)+' m²'}
+function measureStart(mode){stopModes();measureMode=mode;map.getContainer().style.cursor='crosshair';tip.textContent=mode==='distance'?'Đo chiều dài: click các điểm.':'Đo diện tích: click các đỉnh.';tip.classList.add('show')}
+document.getElementById('measureDistance').onclick=()=>measureStart('distance');document.getElementById('measureArea').onclick=()=>measureStart('area');document.getElementById('measureClear').onclick=()=>{measureLayer.clearLayers();stopModes()};
+function refreshMeasurePreview(mouse){if(!measureMode||!measurePts.length)return;const pts=mouse?[...measurePts,mouse]:measurePts;if(measurePreview)map.removeLayer(measurePreview);measurePreview=measureMode==='area'?L.polygon(pts,{pane:'workPane',color:'#facc15',weight:2,fillColor:'#facc15',fillOpacity:.13,dashArray:'6 5'}):L.polyline(pts,{pane:'workPane',color:'#facc15',weight:3,dashArray:'6 5'});measurePreview.addTo(map);tip.textContent=measureMode==='area'?'Diện tích: '+fmtA(area(pts)):'Chiều dài: '+fmtD(dist(pts))}
+function finishMeasure(){if(measureMode==='distance'&&measurePts.length>=2)L.polyline(measurePts,{pane:'workPane',color:'#facc15',weight:3}).addTo(measureLayer);if(measureMode==='area'&&measurePts.length>=3)L.polygon(measurePts,{pane:'workPane',color:'#facc15',weight:2,fillColor:'#facc15',fillOpacity:.16}).addTo(measureLayer);const txt=measureMode==='area'?fmtA(area(measurePts)):fmtD(dist(measurePts));stopModes();tip.textContent='Kết quả: '+txt;tip.classList.add('show');setTimeout(()=>tip.classList.remove('show'),5000)}document.getElementById('measureFinish').onclick=finishMeasure;
 
-    // Panel manager.
-    const panelIds=['layersPanel','infoPanel','drawPanel','measurePanel'];
-    function closePanels(except=''){
-      panelIds.forEach(id=>{if(id!==except)document.getElementById(id).classList.remove('open')});
-      ['layersBtn','infoBtn','drawBtn','measureBtn'].forEach(id=>document.getElementById(id).classList.remove('active'));
-    }
-    function togglePanel(id,btnId){
-      const p=document.getElementById(id),was=p.classList.contains('open');
-      closePanels();
-      if(!was){p.classList.add('open');document.getElementById(btnId).classList.add('active')}
-    }
-    document.querySelectorAll('[data-close]').forEach(b=>b.onclick=()=>{document.getElementById(b.dataset.close).classList.remove('open');closePanels()});
+let routeStartMarker=null,routeEndMarker=null,routeCoords={start:null,end:null};function routeIcon(type){return L.divIcon({className:'dot-icon',html:`<div class="route-pin ${type==='start'?'a':'b'}">${type==='start'?'A':'B'}</div>`,iconSize:[24,24],iconAnchor:[12,12]})}function setRoutePoint(type,ll){routeCoords[type]=ll;const key=type==='start'?'routeStartMarker':'routeEndMarker';if(window[key])routeLayer.removeLayer(window[key]);const m=L.marker(ll,{icon:routeIcon(type),pane:'workPane'}).addTo(routeLayer);if(type==='start')routeStartMarker=m;else routeEndMarker=m;document.getElementById(type==='start'?'routeStart':'routeEnd').value=`${ll.lat.toFixed(6)}, ${ll.lng.toFixed(6)}`}
+document.querySelectorAll('[data-pick]').forEach(b=>b.onclick=()=>{stopModes();routePick=b.dataset.pick;map.getContainer().style.cursor='crosshair';tip.textContent='Click trên bản đồ để chọn điểm '+(routePick==='start'?'A':'B');tip.classList.add('show')});
+async function resolvePlace(text){const m=text.trim().match(/^(-?\d+(?:\.\d+)?)\s*[, ]\s*(-?\d+(?:\.\d+)?)$/);if(m)return L.latLng(+m[1],+m[2]);const r=await fetch('https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&accept-language=vi&q='+encodeURIComponent(text));if(!r.ok)throw new Error('Không tìm được địa chỉ');const j=await r.json();if(!j.length)throw new Error('Không tìm thấy địa điểm: '+text);return L.latLng(+j[0].lat,+j[0].lon)}
+const routeResult=document.getElementById('routeResult');function showRoute(msg){routeResult.textContent=msg;routeResult.classList.add('show')}
+document.getElementById('routeSwap').onclick=()=>{const a=document.getElementById('routeStart'),b=document.getElementById('routeEnd'),t=a.value;a.value=b.value;b.value=t;const c=routeCoords.start;routeCoords.start=routeCoords.end;routeCoords.end=c;if(routeCoords.start)setRoutePoint('start',routeCoords.start);if(routeCoords.end)setRoutePoint('end',routeCoords.end)};
+document.getElementById('routeClear').onclick=()=>{routeLayer.clearLayers();routeStartMarker=routeEndMarker=null;routeCoords={start:null,end:null};document.getElementById('routeStart').value='';document.getElementById('routeEnd').value='';routeResult.classList.remove('show')};
+document.getElementById('routeCalc').onclick=async()=>{const btn=document.getElementById('routeCalc');btn.disabled=true;showRoute('Đang tính tuyến đường…');try{const s=await resolvePlace(document.getElementById('routeStart').value),e=await resolvePlace(document.getElementById('routeEnd').value);setRoutePoint('start',s);setRoutePoint('end',e);routeLayer.eachLayer(l=>{if(l instanceof L.Polyline&&!(l instanceof L.Polygon))routeLayer.removeLayer(l)});const url=`https://router.project-osrm.org/route/v1/driving/${s.lng},${s.lat};${e.lng},${e.lat}?overview=full&geometries=geojson&steps=false`;const r=await fetch(url);if(!r.ok)throw new Error('Dịch vụ định tuyến chưa phản hồi');const j=await r.json();if(!j.routes?.length)throw new Error('Không tìm được tuyến');const rt=j.routes[0],line=L.geoJSON(rt.geometry,{pane:'workPane',style:{color:'#ff3b30',weight:5,opacity:.9}}).addTo(routeLayer);map.fitBounds(line.getBounds(),{padding:[45,45]});showRoute(`Khoảng cách: ${(rt.distance/1000).toFixed(2)} km · Thời gian dự kiến: ${Math.round(rt.duration/60)} phút`)}catch(err){showRoute('Lỗi: '+err.message)}finally{btn.disabled=false}};
 
-    document.getElementById('homeBtn').onclick=()=>map.fitBounds(VIETNAM_BOUNDS,{padding:[24,24]});
-    document.getElementById('zoomInBtn').onclick=()=>map.zoomIn();
-    document.getElementById('zoomOutBtn').onclick=()=>map.zoomOut();
-    document.getElementById('layersBtn').onclick=()=>togglePanel('layersPanel','layersBtn');
-    document.getElementById('infoBtn').onclick=()=>togglePanel('infoPanel','infoBtn');
-    document.getElementById('drawBtn').onclick=()=>togglePanel('drawPanel','drawBtn');
-    document.getElementById('measureBtn').onclick=()=>togglePanel('measurePanel','measureBtn');
-    document.getElementById('fullBtn').onclick=async()=>{
-      try{if(!document.fullscreenElement)await document.documentElement.requestFullscreen();else await document.exitFullscreen()}catch(e){}
-    };
-    document.addEventListener('fullscreenchange',()=>document.getElementById('fullBtn').classList.toggle('active',!!document.fullscreenElement));
+map.on('click',e=>{if(routePick){const type=routePick;routePick=null;setRoutePoint(type,e.latlng);map.getContainer().style.cursor='';tip.classList.remove('show');return}if(measureMode){measurePts.push(e.latlng);refreshMeasurePreview();return}if(drawMode){if(drawMode==='point'){L.circleMarker(e.latlng,{pane:'workPane',radius:6,color:'#fff',weight:2,fillColor:'#ff3b30',fillOpacity:1}).addTo(drawn);return}drawPts.push(e.latlng);refreshDrawPreview();}});map.on('mousemove',e=>{updateScale(e.latlng.lat);document.getElementById('coordText').textContent=`${e.latlng.lat.toFixed(5)}°  ${e.latlng.lng.toFixed(5)}°`;if(measureMode)refreshMeasurePreview(e.latlng);if(drawMode)refreshDrawPreview(e.latlng)});map.on('dblclick',()=>{if(measureMode)finishMeasure();else if(drawMode)finishDraw()});
 
-    document.getElementById('baseVisible').onchange=e=>{
-      baseVisible=e.target.checked;
-      if(!baseVisible){generation++;if(activeOverlay&&map.hasLayer(activeOverlay))map.removeLayer(activeOverlay);activeOverlay=null}
-      else refreshNow();
-    };
-    // vietnam_2026 chứa nhãn raster tích hợp. Không thể tắt riêng nhãn mà không có layer/style nhãn độc lập từ WMS.
-    document.getElementById('labelsVisible').onchange=e=>{
-      if(!e.target.checked){
-        e.target.checked=true;
-        e.target.title='Nhãn được tích hợp trong ảnh WMS vietnam_2026 và hiện chưa có layer nhãn tách riêng.';
-      }
-    };
-    document.getElementById('opacityRange').oninput=e=>{
-      baseOpacity=Number(e.target.value)/100;
-      if(activeOverlay)activeOverlay.setOpacity(baseOpacity);
-    };
-
-    // Geolocation.
-    let locationMarker=null,locationCircle=null;
-    document.getElementById('locateBtn').onclick=()=>{
-      const b=document.getElementById('locateBtn');b.classList.add('active');
-      map.locate({setView:true,maxZoom:16,enableHighAccuracy:true,timeout:10000});
-    };
-    map.on('locationfound',e=>{
-      if(locationMarker)map.removeLayer(locationMarker);if(locationCircle)map.removeLayer(locationCircle);
-      locationMarker=L.circleMarker(e.latlng,{radius:7,color:'#fff',weight:2,fillColor:'#1677ff',fillOpacity:1}).addTo(map);
-      locationCircle=L.circle(e.latlng,{radius:e.accuracy,color:'#1677ff',weight:1,fillColor:'#1677ff',fillOpacity:.10}).addTo(map);
-      document.getElementById('locateBtn').classList.remove('active');updateMouseStatus(e.latlng);
-    });
-    map.on('locationerror',()=>document.getElementById('locateBtn').classList.remove('active'));
-
-    // Vẽ tạm.
-    const drawGroup=L.featureGroup().addTo(map);
-    let drawMode=null,drawPoints=[],drawPreview=null;
-    function setDrawMode(mode){drawMode=mode;drawPoints=[];if(drawPreview){drawGroup.removeLayer(drawPreview);drawPreview=null}
-      document.querySelectorAll('[data-draw]').forEach(b=>b.classList.toggle('active',b.dataset.draw===mode));
-      map.getContainer().style.cursor=mode?'crosshair':'';
-    }
-    document.querySelectorAll('[data-draw]').forEach(b=>b.onclick=()=>setDrawMode(b.dataset.draw));
-    function finishDraw(){
-      if(drawPreview){
-        drawPreview.setStyle?.({dashArray:null});drawPreview=null;
-      }
-      drawMode=null;drawPoints=[];document.querySelectorAll('[data-draw]').forEach(b=>b.classList.remove('active'));map.getContainer().style.cursor='';
-    }
-    document.getElementById('finishDrawBtn').onclick=finishDraw;
-    document.getElementById('clearDrawBtn').onclick=()=>{drawGroup.clearLayers();finishDraw()};
-
-    // Đo đạc.
-    const measureGroup=L.featureGroup().addTo(map);
-    let measureMode=null,measurePoints=[],measureShape=null;
-    const readout=document.getElementById('measureReadout');
-    function formatDistance(m){return m>=1000?`${(m/1000).toFixed(2)} km`:`${m.toFixed(1)} m`}
-    function haversine(a,b){return a.distanceTo(b)}
-    function polygonArea(latlngs){
-      if(latlngs.length<3)return 0;
-      const R=6378137,pts=latlngs.map(p=>[p.lng*Math.PI/180,p.lat*Math.PI/180]);let sum=0;
-      for(let i=0;i<pts.length;i++){const p1=pts[i],p2=pts[(i+1)%pts.length];sum+=(p2[0]-p1[0])*(2+Math.sin(p1[1])+Math.sin(p2[1]));}
-      return Math.abs(sum*R*R/2);
-    }
-    function measureValue(){
-      if(measureMode==='distance'){
-        let d=0;for(let i=1;i<measurePoints.length;i++)d+=haversine(measurePoints[i-1],measurePoints[i]);return `Khoảng cách: <b>${formatDistance(d)}</b>`;
-      }
-      const a=polygonArea(measurePoints);return `Diện tích: <b>${a>=1e6?(a/1e6).toFixed(3)+' km²':a.toFixed(1)+' m²'}</b>`;
-    }
-    function setMeasureMode(mode){
-      measureMode=mode;measurePoints=[];if(measureShape)measureGroup.removeLayer(measureShape);measureShape=null;
-      document.getElementById('measureDistanceBtn').classList.toggle('active',mode==='distance');
-      document.getElementById('measureAreaBtn').classList.toggle('active',mode==='area');
-      readout.classList.add('show');readout.innerHTML=mode==='distance'?'Click các điểm để đo khoảng cách.':'Click ít nhất 3 điểm để đo diện tích.';
-      map.getContainer().style.cursor='crosshair';
-    }
-    function finishMeasure(){measureMode=null;map.getContainer().style.cursor='';document.getElementById('measureDistanceBtn').classList.remove('active');document.getElementById('measureAreaBtn').classList.remove('active')}
-    document.getElementById('measureDistanceBtn').onclick=()=>setMeasureMode('distance');
-    document.getElementById('measureAreaBtn').onclick=()=>setMeasureMode('area');
-    document.getElementById('finishMeasureBtn').onclick=finishMeasure;
-    document.getElementById('clearMeasureBtn').onclick=()=>{measureGroup.clearLayers();measurePoints=[];measureShape=null;readout.classList.remove('show');finishMeasure()};
-
-    map.on('click',e=>{
-      updateMouseStatus(e.latlng);
-      if(measureMode){
-        measurePoints.push(e.latlng);
-        L.circleMarker(e.latlng,{radius:4,color:'#fff',weight:1.5,fillColor:'#facc15',fillOpacity:1}).addTo(measureGroup);
-        if(measureShape)measureGroup.removeLayer(measureShape);
-        if(measureMode==='distance')measureShape=L.polyline(measurePoints,{color:'#facc15',weight:3,className:'measure-line'}).addTo(measureGroup);
-        else measureShape=L.polygon(measurePoints,{color:'#facc15',weight:3,fillColor:'#facc15',fillOpacity:.14,className:'measure-line'}).addTo(measureGroup);
-        readout.innerHTML=measureValue();return;
-      }
-      if(drawMode){
-        if(drawMode==='point'){L.circleMarker(e.latlng,{radius:6,color:'#fff',weight:2,fillColor:'#00a6ff',fillOpacity:1}).addTo(drawGroup);return;}
-        drawPoints.push(e.latlng);
-        if(drawPreview)drawGroup.removeLayer(drawPreview);
-        drawPreview=drawMode==='line'
-          ?L.polyline(drawPoints,{color:'#00a6ff',weight:3,dashArray:'7 5'}).addTo(drawGroup)
-          :L.polygon(drawPoints,{color:'#00a6ff',weight:3,fillColor:'#00a6ff',fillOpacity:.12,dashArray:'7 5'}).addTo(drawGroup);
-      }
-    });
-
-    window.addEventListener('resize',()=>{map.invalidateSize();scheduleRefresh(120)});
-  })();
-  </script>
+const scaleInput=document.getElementById('scaleInput');function scaleDen(lat){const mpp=156543.03392804097*Math.cos(lat*Math.PI/180)/Math.pow(2,map.getZoom());return Math.max(1,Math.round(mpp*3779.527559055))}function updateScale(lat){scaleInput.value=scaleDen(lat).toLocaleString('en-US').replaceAll(',','')}function applyScale(){const raw=Number(scaleInput.value.replace(/[^0-9.]/g,''));if(!raw||raw<1)return;const lat=map.getCenter().lat,z=Math.log2((156543.03392804097*Math.cos(lat*Math.PI/180)*3779.527559055)/raw);map.setZoom(Math.max(map.getMinZoom(),Math.min(map.getMaxZoom(),Math.round(z))))}scaleInput.addEventListener('keydown',e=>{if(e.key==='Enter')applyScale()});scaleInput.addEventListener('change',applyScale);updateScale(map.getCenter().lat);
+})();
+</script>
 </body>
 </html>
