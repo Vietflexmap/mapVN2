@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <meta name="theme-color" content="#0b1724" />
+  <meta name="theme-color" content="#dbe7ed" />
   <title>Bản đồ nền Việt Nam</title>
 
   <link
@@ -15,10 +15,10 @@
 
   <style>
     :root {
-      --panel: rgba(8, 20, 33, 0.90);
+      --panel: rgba(8, 20, 33, 0.92);
       --border: rgba(255,255,255,0.16);
       --text: #f8fafc;
-      --muted: #cbd5e1;
+      --map-bg: #dbe7ed;
     }
 
     * { box-sizing: border-box; }
@@ -32,13 +32,13 @@
     body {
       overflow: hidden;
       font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      background: #0b1724;
+      background: var(--map-bg);
     }
 
     #map {
       position: fixed;
       inset: 0;
-      background: #d9e4ea;
+      background: var(--map-bg);
     }
 
     .map-title {
@@ -74,12 +74,16 @@
     }
 
     .leaflet-control-zoom a:hover {
-      background: rgba(17, 35, 54, .96) !important;
+      background: rgba(17, 35, 54, .98) !important;
     }
 
     .leaflet-popup,
     .leaflet-control-attribution {
       display: none !important;
+    }
+
+    .leaflet-image-layer {
+      transition: opacity .18s ease-out;
     }
 
     @media (max-width: 600px) {
@@ -107,31 +111,158 @@
       'use strict';
 
       const WMS_URL = 'https://cache.bando.com.vn/service';
+      const LAYER = 'vietnam_2026';
+
+      // Thay vì gọi hàng chục tile 256x256 cùng lúc, trang gọi một ảnh WMS
+      // bao phủ toàn viewport và dư ra xung quanh. Điều này giảm mạnh request rớt,
+      // tránh các ô trắng như bản cũ, đồng thời giữ ảnh cũ cho tới khi ảnh mới tải xong.
+      const BUFFER = 0.28;
+      const MAX_IMAGE_SIDE = 1800;
+      const RETRY_SCALES = [1, 0.78, 0.58];
 
       const map = L.map('map', {
-        center: [16.3, 106.0],
+        center: [16.25, 106.0],
         zoom: 6,
         minZoom: 4,
-        maxZoom: 19,
+        maxZoom: 18,
         zoomControl: true,
         attributionControl: false,
-        preferCanvas: true
+        preferCanvas: true,
+        fadeAnimation: false,
+        zoomAnimation: true,
+        markerZoomAnimation: false,
+        worldCopyJump: false
       });
 
-      const vietnamBasemap = L.tileLayer.wms(WMS_URL, {
-        layers: 'vietnam_2026',
-        format: 'image/png',
-        transparent: true,
-        version: '1.1.1',
-        tiled: true,
-        uppercase: true
+      // Khung mặc định đủ nhìn trọn phần đất liền Việt Nam.
+      map.fitBounds([[8.0, 102.0], [23.5, 110.5]], {
+        padding: [26, 26],
+        animate: false
       });
 
-      vietnamBasemap.addTo(map);
+      let activeOverlay = null;
+      let generation = 0;
+      let refreshTimer = 0;
 
-      map.on('tileerror', () => {
-        console.warn('Không tải được một hoặc nhiều tile WMS từ nguồn bản đồ.');
-      });
+      function projectedBBox(bounds) {
+        const sw = map.options.crs.project(bounds.getSouthWest());
+        const ne = map.options.crs.project(bounds.getNorthEast());
+        return [sw.x, sw.y, ne.x, ne.y].join(',');
+      }
+
+      function requestGeometry(scaleFactor) {
+        const size = map.getSize();
+        const pxX = Math.round(size.x * BUFFER);
+        const pxY = Math.round(size.y * BUFFER);
+
+        // Tính bounds từ pixel để tỷ lệ BBOX khớp chính xác tỷ lệ ảnh.
+        const nw = map.containerPointToLatLng(L.point(-pxX, -pxY));
+        const se = map.containerPointToLatLng(L.point(size.x + pxX, size.y + pxY));
+        const bounds = L.latLngBounds(nw, se);
+
+        const bufferedW = size.x + 2 * pxX;
+        const bufferedH = size.y + 2 * pxY;
+        const dpr = Math.min(window.devicePixelRatio || 1, 1.5);
+
+        let renderScale = dpr * scaleFactor;
+        renderScale = Math.min(
+          renderScale,
+          MAX_IMAGE_SIDE / bufferedW,
+          MAX_IMAGE_SIDE / bufferedH
+        );
+        renderScale = Math.max(renderScale, 0.25);
+
+        return {
+          bounds,
+          width: Math.max(256, Math.round(bufferedW * renderScale)),
+          height: Math.max(256, Math.round(bufferedH * renderScale))
+        };
+      }
+
+      function buildWmsUrl(bounds, width, height) {
+        const p = new URLSearchParams();
+        p.set('REQUEST', 'GetMap');
+        p.set('SERVICE', 'WMS');
+        p.set('VERSION', '1.1.1');
+        p.set('FORMAT', 'image/png');
+        p.set('STYLES', '');
+        p.set('TRANSPARENT', 'true');
+        p.set('LAYERS', LAYER);
+        p.set('TILED', 'false');
+        p.set('WIDTH', String(width));
+        p.set('HEIGHT', String(height));
+        p.set('SRS', 'EPSG:3857');
+        p.set('BBOX', projectedBBox(bounds));
+        return `${WMS_URL}?${p.toString()}`;
+      }
+
+      function loadGeneration(myGeneration, attempt = 0) {
+        if (myGeneration !== generation) return;
+
+        const scaleFactor = RETRY_SCALES[Math.min(attempt, RETRY_SCALES.length - 1)];
+        const geometry = requestGeometry(scaleFactor);
+        const url = buildWmsUrl(geometry.bounds, geometry.width, geometry.height);
+
+        const candidate = L.imageOverlay(url, geometry.bounds, {
+          opacity: 0,
+          interactive: false,
+          crossOrigin: false,
+          errorOverlayUrl: ''
+        });
+
+        candidate.on('load', () => {
+          if (myGeneration !== generation) {
+            map.removeLayer(candidate);
+            return;
+          }
+
+          candidate.setOpacity(1);
+          const previous = activeOverlay;
+          activeOverlay = candidate;
+
+          if (previous && previous !== candidate) {
+            window.setTimeout(() => {
+              if (map.hasLayer(previous)) map.removeLayer(previous);
+            }, 180);
+          }
+        });
+
+        candidate.on('error', () => {
+          if (map.hasLayer(candidate)) map.removeLayer(candidate);
+          if (myGeneration !== generation) return;
+
+          if (attempt + 1 < RETRY_SCALES.length) {
+            window.setTimeout(
+              () => loadGeneration(myGeneration, attempt + 1),
+              350 * (attempt + 1)
+            );
+          } else {
+            // Server tạm rớt: giữ ảnh cũ và tự thử lại sau, không để màn hình trắng.
+            window.setTimeout(() => {
+              if (myGeneration === generation) refreshNow();
+            }, 1800);
+          }
+        });
+
+        candidate.addTo(map);
+        candidate.bringToBack();
+      }
+
+      function refreshNow() {
+        generation += 1;
+        loadGeneration(generation, 0);
+      }
+
+      function scheduleRefresh(delay = 90) {
+        window.clearTimeout(refreshTimer);
+        refreshTimer = window.setTimeout(refreshNow, delay);
+      }
+
+      // Giữ ảnh hiện tại trong lúc kéo/zoom. Chỉ thay khi ảnh mới đã tải hoàn chỉnh.
+      map.on('moveend zoomend', () => scheduleRefresh(80));
+      map.on('resize', () => scheduleRefresh(140));
+
+      map.whenReady(() => refreshNow());
     })();
   </script>
 </body>
