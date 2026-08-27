@@ -1,85 +1,45 @@
 # Bản đồ nền Việt Nam — mapVN2
 
-WebGIS một trang, chạy trực tiếp trên GitHub Pages và sử dụng lớp WMS `vietnam_2026` từ `https://cache.bando.com.vn/service` mà không cần backend riêng.
+WebGIS một trang chạy trực tiếp trên GitHub Pages.
 
-## Giao diện 2026
+## Kiến trúc lớp bản đồ đã xác định từ mã nguồn gốc
 
-Thanh công cụ được thiết kế lại theo dạng website, nằm ngang cố định ở phía trên:
+Phân tích `4_map.js` trong bộ mã nguồn cho thấy website nguồn **tách riêng lớp bản đồ và lớp nhãn**:
 
-- icon màu đỏ, chữ màu vàng;
-- Toàn quốc;
-- Phóng to / Thu nhỏ;
-- Toàn màn hình;
-- Lớp bản đồ;
-- Thông tin;
-- Vẽ dữ liệu;
-- Đo đạc;
-- Tìm đường;
-- Định vị GPS.
+- `vietnam_2026` — lớp bản đồ nền;
+- `vietnam_label_2026` — lớp nhãn bản đồ;
+- cả hai được tải từ `https://cache.bando.com.vn/service` bằng WMS 1.1.1, EPSG:3857.
 
-Mỗi công cụ có panel riêng và tại một thời điểm chỉ mở một panel để tránh che bản đồ.
+Website gốc tạo đồng thời `vn1tr` và `vn1trLabel`; khi bật/tắt `vn1tr` thì bật/tắt cả hai. Vì vậy mapVN2 cũng triển khai hai lớp riêng thay vì giả định nhãn đã nằm hoàn toàn trong `vietnam_2026`.
 
-## Lớp bản đồ
+## Nhãn bản đồ
 
-### Lớp nền tùy chọn
+`vietnam_label_2026` được bật mặc định và nằm phía trên `vietnam_2026`. Đây là nguồn nhãn gốc dùng để bổ sung tên tỉnh/thành, xã/phường, sông suối, địa danh và các nhãn cartography khác theo tỷ lệ do máy chủ quy định.
 
-- ESRI Terrain;
-- ESRI World Imagery;
-- Không dùng lớp nền.
+mapVN2 tải lớp nhãn theo toàn viewport, không chia lớp nhãn thành các tile nhỏ, nhằm giảm tình trạng rớt từng ô nhãn. Kích thước request bám sát viewport để giữ scale denominator gần với màn hình thực tế.
 
-### Lớp phủ chính
+## Chú giải
 
-- **Bản đồ nền Việt Nam** — WMS `vietnam_2026`;
-- điều chỉnh opacity;
-- bật/tắt lớp;
-- nhãn địa danh được ghi nhận là nhãn raster tích hợp trong WMS hiện tại;
-- dữ liệu người dùng vẽ trong phiên có thể bật/tắt.
+Bảng chú giải từ `https://cosodulieu.bando.com.vn/static/map/images/cg6.jpg` được hiển thị cố định ở góc phải. Có thể thu gọn bằng nút `−/+` hoặc ẩn/hiện bằng nút **Chú giải** trên thanh công cụ.
 
-## Chống lỗi WMS
+Chú giải bao gồm biên giới quốc gia, địa giới cấp tỉnh, địa giới cấp xã, tên vùng kinh tế xã hội, tên tỉnh, thủ đô, thành phố trực thuộc trung ương, điểm dân cư, công trình văn hóa/tôn giáo, khu du lịch, cảng hàng không, cảng biển, san hô và các dạng đá ven biển.
 
-Không dùng `TileWMS` 256×256 làm lớp chính. Trang sử dụng single-image WMS theo viewport, có vùng buffer, giữ ảnh cũ đến khi ảnh mới tải xong và tự retry ở độ phân giải thấp hơn nếu máy chủ trả lỗi. Cách này hạn chế hiện tượng bản đồ bị thủng thành các ô vuông.
+## Công cụ
 
-## Đo đạc
-
-- Đo chiều dài;
-- Đo diện tích;
-- cập nhật kết quả trong lúc rê chuột;
-- kết thúc bằng double-click hoặc nút **Kết thúc đo**;
-- xóa toàn bộ kết quả đo.
-
-## Tìm đường
-
-- nhập tọa độ `lat,lon` hoặc địa chỉ;
-- có thể chọn điểm A/B trực tiếp trên bản đồ;
-- đổi điểm đầu / điểm cuối;
-- tuyến lái xe dùng OSRM public demo;
-- địa chỉ văn bản dùng Nominatim;
-- hiển thị khoảng cách và thời gian dự kiến.
-
-> OSRM và Nominatim là dịch vụ bên ngoài; khả năng hoạt động phụ thuộc dịch vụ công cộng tại thời điểm sử dụng.
-
-## Vẽ dữ liệu
-
-Hỗ trợ vẽ tạm:
-
-- Point;
-- LineString;
-- Polygon.
-
-Dữ liệu chỉ tồn tại trong phiên trình duyệt hiện tại.
-
-## Tọa độ và tỷ lệ
-
-Góc dưới phải hiển thị:
-
-- tọa độ WGS84 theo vị trí con trỏ;
-- tỷ lệ xích động dạng `1:n`;
-- có thể nhập mẫu số tỷ lệ để đưa bản đồ tới mức zoom gần tương ứng.
-
-Góc dưới trái có thước tỷ lệ mét/km.
+- ESRI Terrain / ESRI World Imagery;
+- bật/tắt và opacity Bản đồ nền Việt Nam;
+- bật/tắt và opacity Nhãn bản đồ đầy đủ;
+- chú giải góc phải;
+- tọa độ WGS84 theo con trỏ;
+- tỷ lệ xích và thước tỷ lệ;
+- phóng to / thu nhỏ / toàn quốc / toàn màn hình;
+- vẽ điểm, tuyến, vùng;
+- đo chiều dài và diện tích;
+- định vị GPS;
+- tìm đường A → B bằng OSRM public demo và geocoding Nominatim.
 
 ## Triển khai
 
-GitHub Pages:
+GitHub Pages: `https://vietflexmap.github.io/mapVN2/`
 
-`https://vietflexmap.github.io/mapVN2/`
+> Dữ liệu/nhãn WMS vẫn phụ thuộc máy chủ nguồn và quy tắc hiển thị theo tỷ lệ phía server. Những lớp hoặc mức chi tiết yêu cầu đăng nhập/PRO của website nguồn không được vượt qua bằng frontend này.
